@@ -4,8 +4,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import { app } from "./firebase"; // Ensure correct path
-
+import app from './firebase'; // or '../firebase'
 const auth = getAuth(app);
 
 export const signUp = async (email, password) => {
