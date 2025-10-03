@@ -3,11 +3,5 @@
   "buildCommand": "npm run build",
   "outputDirectory": "build",
   "installCommand": "npm install --legacy-peer-deps",
-  "framework": "create-react-app",
-  "regions": ["iad1"],
-  "functions": {
-    "build/**": {
-      "maxDuration": 30
-    }
-  }
+  "framework": "create-react-app"
 }
