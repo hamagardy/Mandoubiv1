@@ -16,8 +16,10 @@ import SalesForecasting from "./components/SalesForecasting";
 import AdminMembersList from "./components/AdminMembersList";
 import FollowUp from "./components/FollowUp";
 import PharmaLocations from "./components/PharmaLocations";
+import Brochure from "./components/Brochure";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./components/Login";
+import WelcomePopup from "./components/WelcomePopup";
 import { LanguageProvider } from "./components/LanguageContext";
 import { SellerProvider } from "./components/SellerContext";
 import { auth, db } from "./firebase";
@@ -38,27 +40,32 @@ const AppContent = ({
   permissions,
   setUser,
   setRole,
-  ...props
+  currency,
+  exchangeRate,
+  monthlyTargetPrices,
+  resetAllSales,
+  changeCurrency,
+  updateTargetPrice,
+  updateUserPermissions,
+  setMonthlyTargetPrices,
+  selectedBrochureItems,
+  setSelectedBrochureItems,
 }) => {
   const navigate = useNavigate();
-  const [hasRedirected, setHasRedirected] = React.useState(false); // Track if redirect has occurred
+  const [hasRedirected, setHasRedirected] = React.useState(false);
+
+  useEffect(() => {
+    setHasRedirected(false);
+  }, [user]);
 
   useEffect(() => {
     if (!hasRedirected) {
-      // Only redirect once on initial load
       if (user) {
-        if (
-          window.location.pathname === "/login" ||
-          window.location.pathname === ""
-        ) {
-          navigate("/");
-          setHasRedirected(true);
-        }
+        navigate("/");
+        setHasRedirected(true);
       } else {
-        if (window.location.pathname !== "/login") {
-          navigate("/login");
-          setHasRedirected(true);
-        }
+        navigate("/login");
+        setHasRedirected(true);
       }
     }
   }, [user, navigate, hasRedirected]);
@@ -73,31 +80,82 @@ const AppContent = ({
         style={{ paddingTop: !isLoginPage && user ? "120px" : "20px" }}
       >
         <Routes>
-          <Route path="/" element={<SalesSummary {...props} role={role} />} />
-          <Route path="/daily-sales" element={<DailySalesEntry {...props} />} />
+          <Route
+            path="/"
+            element={
+              <SalesSummary
+                role={role}
+                currency={currency}
+                exchangeRate={exchangeRate}
+                monthlyTargetPrices={monthlyTargetPrices}
+                updateTargetPrice={updateTargetPrice}
+                setMonthlyTargetPrices={setMonthlyTargetPrices}
+              />
+            }
+          />
+          <Route
+            path="/daily-sales"
+            element={
+              <DailySalesEntry
+                currency={currency}
+                exchangeRate={exchangeRate}
+                selectedBrochureItems={selectedBrochureItems}
+                setSelectedBrochureItems={setSelectedBrochureItems}
+              />
+            }
+          />
           <Route
             path="/sales-data"
-            element={<SalesData {...props} role={role} />}
+            element={
+              <SalesData
+                role={role}
+                permissions={permissions}
+                currency={currency}
+                exchangeRate={exchangeRate}
+              />
+            }
           />
           <Route
             path="/reports"
-            element={<SalesReports {...props} role={role} />}
+            element={
+              <SalesReports
+                role={role}
+                currency={currency}
+                exchangeRate={exchangeRate}
+              />
+            }
           />
           <Route
             path="/items"
             element={
               <ProtectedRoute requiredRole="admin" userRole={role}>
-                <Items {...props} />
+                <Items currency={currency} exchangeRate={exchangeRate} />
               </ProtectedRoute>
             }
           />
           <Route
             path="/settings"
-            element={<Settings {...props} role={role} />}
+            element={
+              <Settings
+                role={role}
+                currency={currency}
+                changeCurrency={changeCurrency}
+                monthlyTargetPrices={monthlyTargetPrices}
+                updateTargetPrice={updateTargetPrice}
+                resetAllSales={resetAllSales}
+              />
+            }
           />
           <Route
             path="/sales-forecast"
-            element={<SalesForecasting {...props} role={role} />}
+            element={
+              <SalesForecasting
+                role={role}
+                currency={currency}
+                exchangeRate={exchangeRate}
+                monthlyTargetPrices={monthlyTargetPrices}
+              />
+            }
           />
           <Route
             path="/admin-members"
@@ -111,14 +169,24 @@ const AppContent = ({
             path="/follow-up"
             element={
               <ProtectedRoute requiredRole="admin" userRole={role}>
-                <FollowUp {...props} />
+                <FollowUp currency={currency} exchangeRate={exchangeRate} />
               </ProtectedRoute>
             }
           />
           <Route path="/pharma-locations" element={<PharmaLocations />} />
+          <Route
+            path="/brochure"
+            element={
+              <Brochure
+                selectedBrochureItems={selectedBrochureItems}
+                setSelectedBrochureItems={setSelectedBrochureItems}
+              />
+            }
+          />
           <Route path="/login" element={<Login />} />
         </Routes>
       </main>
+      <WelcomePopup user={user} />
       <footer className="footer">
         <p>
           Mandoubi App Beta 1 powered by{" "}
@@ -134,21 +202,20 @@ const AppContent = ({
     </div>
   );
 };
+
 function App() {
   const [currency, setCurrency] = React.useState("IQD");
   const [exchangeRate, setExchangeRate] = React.useState(1550);
   const [monthlyTargetPrices, setMonthlyTargetPrices] = React.useState(null);
   const [role, setRole] = React.useState(null);
-  const [permissions, setPermissions] = React.useState({}); // Add permissions state
+  const [permissions, setPermissions] = React.useState({});
   const [user, setUser] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
+  const [selectedBrochureItems, setSelectedBrochureItems] = React.useState([]);
 
   useEffect(() => {
-    console.log("App useEffect started");
-
     const loadingTimeout = setTimeout(() => {
       if (loading) {
-        console.warn("Loading timeout exceeded");
         setLoading(false);
         if (monthlyTargetPrices === null) setMonthlyTargetPrices({});
       }
@@ -179,10 +246,24 @@ function App() {
                         adminMembers: true,
                         followUp: true,
                         pharmaLocations: true,
+                        brochure: true,
+                        // New permission fields for admin
+                        viewAllSalesData: true,
+                        changeVisitStatus: true,
+                        changePermissions: true,
+                        changePrice: true,
+                        changeBonus: true,
                       }
                     : userData.permissions || {}
                 );
+                // Ensure monthlyTargetPrices is always set from Firestore
                 setMonthlyTargetPrices(userData.monthlyTargetPrices || {});
+                console.log(
+                  "Fetched monthlyTargetPrices for user",
+                  currentUser.uid,
+                  ":",
+                  userData.monthlyTargetPrices || {}
+                );
               } else {
                 const defaultRole =
                   currentUser.uid === "qBnUF4aOaYPxHP2VlDdQOq2sEKl2"
@@ -199,7 +280,15 @@ function App() {
                   adminMembers: defaultRole === "admin",
                   followUp: defaultRole === "admin",
                   pharmaLocations: true,
+                  brochure: true,
+                  // New permission fields - regular users start with false, can be granted by admin
+                  viewAllSalesData: defaultRole === "admin",
+                  changeVisitStatus: false, // Regular users start with false
+                  changePermissions: defaultRole === "admin",
+                  changePrice: false, // Regular users start with false
+                  changeBonus: false, // Regular users start with false
                 };
+                const initialTargets = {}; // Empty initially, updated by admin
                 setRole(defaultRole);
                 setPermissions(
                   defaultRole === "admin"
@@ -214,6 +303,13 @@ function App() {
                         adminMembers: true,
                         followUp: true,
                         pharmaLocations: true,
+                        brochure: true,
+                        // New permission fields for admin
+                        viewAllSalesData: true,
+                        changeVisitStatus: true,
+                        changePermissions: true,
+                        changePrice: true,
+                        changeBonus: true,
                       }
                     : defaultPermissions
                 );
@@ -221,8 +317,9 @@ function App() {
                   email: currentUser.email,
                   role: defaultRole,
                   permissions: defaultPermissions,
-                  monthlyTargetPrices: {},
+                  monthlyTargetPrices: initialTargets,
                 });
+                setMonthlyTargetPrices(initialTargets);
               }
               setLoading(false);
             },
@@ -275,23 +372,61 @@ function App() {
     if (user) {
       const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, { monthlyTargetPrices: updatedTargets });
+      console.log(
+        "Admin updated monthlyTargetPrices for user",
+        user.uid,
+        ":",
+        updatedTargets
+      );
 
       if (role === "admin") {
         const usersRef = collection(db, "users");
         const snapshot = await getDocs(usersRef);
         await Promise.all(
-          snapshot.docs
-            .filter((doc) => doc.id !== user.uid)
-            .map((doc) =>
-              updateDoc(doc.ref, {
-                monthlyTargetPrices: {
-                  ...doc.data().monthlyTargetPrices,
-                  [month]: numericTarget,
-                },
-              })
-            )
+          snapshot.docs.map((docSnap) => {
+            const docRef = doc(db, "users", docSnap.id);
+            const currentTargets = docSnap.data().monthlyTargetPrices || {};
+            return updateDoc(docRef, {
+              monthlyTargetPrices: {
+                ...currentTargets,
+                [month]: numericTarget,
+              },
+            });
+          })
+        );
+        console.log(
+          "Admin propagated monthlyTargetPrices to all users:",
+          updatedTargets
         );
       }
+    }
+  };
+
+  const updateUserPermissions = async (permission, value) => {
+    if (role !== "admin" || !user) {
+      throw new Error("Only admin can update permissions");
+    }
+
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const updatedPermissions = { ...permissions, [permission]: value };
+      
+      await updateDoc(userRef, { permissions: updatedPermissions });
+      setPermissions(updatedPermissions);
+      
+      console.log(
+        "Updated permission",
+        permission,
+        "to",
+        value,
+        "for user",
+        user.uid
+      );
+      
+      return true;
+    } catch (error) {
+      console.error("Error updating user permissions:", error);
+      throw error;
     }
   };
 
@@ -308,7 +443,7 @@ function App() {
           <AppContent
             user={user}
             role={role}
-            permissions={permissions} // Pass permissions
+            permissions={permissions}
             setUser={setUser}
             setRole={setRole}
             currency={currency}
@@ -317,7 +452,10 @@ function App() {
             resetAllSales={resetAllSales}
             changeCurrency={changeCurrency}
             updateTargetPrice={updateTargetPrice}
+            updateUserPermissions={updateUserPermissions}
             setMonthlyTargetPrices={setMonthlyTargetPrices}
+            selectedBrochureItems={selectedBrochureItems}
+            setSelectedBrochureItems={setSelectedBrochureItems}
           />
         </Router>
       </SellerProvider>

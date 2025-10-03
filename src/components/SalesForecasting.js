@@ -39,6 +39,7 @@ const translations = {
     exportAsPDF: "Export as PDF",
     exportAsExcel: "Export as Excel",
     noSalesData: "No sales data available for forecasting.",
+    loading: "Loading...",
   },
   ar: {
     salesForecasting: "توقعات المبيعات",
@@ -48,6 +49,7 @@ const translations = {
     exportAsPDF: "تصدير كـ PDF",
     exportAsExcel: "تصدير كـ Excel",
     noSalesData: "لا توجد بيانات مبيعات متاحة للتنبؤ.",
+    loading: "جارٍ التحميل...",
   },
   ku: {
     salesForecasting: "پێشبینیکردنی فرۆشتن",
@@ -57,6 +59,7 @@ const translations = {
     exportAsPDF: "پەیوەندیدانی بە PDF",
     exportAsExcel: "پەیوەندیدانی بە Excel",
     noSalesData: "هیچ داتای فرۆشتنێک بۆ پێشبینیکردن بەردەست نیە.",
+    loading: "بارکردن...",
   },
 };
 
@@ -64,13 +67,20 @@ const SalesForecasting = ({
   currency,
   exchangeRate,
   role,
-  monthlyTargetPrices,
+  monthlyTargetPrices = {},
 }) => {
   const [sales, setSales] = useState([]);
   const [forecastData, setForecastData] = useState([]);
   const { language } = useContext(LanguageContext);
   const { selectedSeller } = useSeller();
   const currentMonth = new Date().getMonth();
+
+  useEffect(() => {
+    console.log(
+      "monthlyTargetPrices in SalesForecasting:",
+      monthlyTargetPrices
+    );
+  }, [monthlyTargetPrices]);
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -138,7 +148,6 @@ const SalesForecasting = ({
 
   const handleExportPDF = () => {
     const input = document.getElementById("forecast-container");
-
     html2canvas(input, {
       scale: 2,
       useCORS: true,
@@ -168,9 +177,14 @@ const SalesForecasting = ({
 
   const handleExportExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(
-      forecastData.map((data) => ({
+      forecastData.slice(0, 12).map((data, index) => ({
         Month: data.month,
         "Forecasted Sales": priceDisplay(data.sales),
+        Target: priceDisplay(
+          monthlyTargetPrices[index] !== undefined
+            ? monthlyTargetPrices[index]
+            : 13000000
+        ),
       }))
     );
     const workbook = XLSX.utils.book_new();
@@ -183,7 +197,6 @@ const SalesForecasting = ({
     saveAs(data, "sales_forecast.xlsx");
   };
 
-  // Updated chartData to reflect individual monthly targets
   const chartData = {
     labels: forecastData.slice(0, 12).map((data) => data.month),
     datasets: [
@@ -196,10 +209,14 @@ const SalesForecasting = ({
       },
       {
         label: "Target",
-        data: forecastData
-          .slice(0, 12)
+        data: Array(12)
+          .fill(0)
           .map((_, index) =>
-            priceDisplay(monthlyTargetPrices[index] || 13000000)
+            priceDisplay(
+              monthlyTargetPrices[index] !== undefined
+                ? monthlyTargetPrices[index]
+                : 13000000
+            )
           ),
         backgroundColor: "rgba(94, 114, 228, 0.2)",
         borderColor: "#5e72e4",
@@ -269,7 +286,11 @@ const SalesForecasting = ({
                     <p className="text-[#67748e] mt-1">
                       Target:{" "}
                       <span className="font-bold">
-                        {priceDisplay(monthlyTargetPrices[index] || 13000000)}{" "}
+                        {priceDisplay(
+                          monthlyTargetPrices[index] !== undefined
+                            ? monthlyTargetPrices[index]
+                            : 13000000
+                        )}{" "}
                         {currency}
                       </span>
                     </p>

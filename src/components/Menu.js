@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LanguageContext } from "./LanguageContext";
 import { auth } from "../firebase";
@@ -16,6 +16,7 @@ const translations = {
     adminMembers: "Admin Members",
     followUp: "Follow Up",
     pharmaLocations: "Pharma Locations",
+    brochure: "Brochure", // New translation
     logout: "Logout",
   },
   ar: {
@@ -29,6 +30,7 @@ const translations = {
     adminMembers: "أعضاء الإدارة",
     followUp: "متابعة",
     pharmaLocations: "مکان صیدلیات",
+    brochure: "بروشور", // New translation
     logout: "تسجيل الخروج",
   },
   ku: {
@@ -42,35 +44,77 @@ const translations = {
     adminMembers: "ئەندامەکانی بەڕێوەبردن",
     followUp: "بەدواداچوون",
     pharmaLocations: "شوێنی دەرمانخانەکان",
+    brochure: "بروشور", // New translation
     logout: "چوونەدەرەوە",
   },
 };
 
 const Menu = ({ role, permissions }) => {
-  const { language } = useContext(LanguageContext);
+  const { language, changeLanguage } = useContext(LanguageContext);
   const isAdmin = role === "admin";
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLanguageOpen, setIsLanguageOpen] = useState(false);
+  const languageRef = useRef(null);
   const navigate = useNavigate();
+
+  // Close language dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (languageRef.current && !languageRef.current.contains(event.target)) {
+        setIsLanguageOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleLogout = async () => {
     await signOut(auth);
   };
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+  const toggleLanguage = () => setIsLanguageOpen(!isLanguageOpen);
+
+  const getLanguageFlag = (lang) => {
+    switch (lang) {
+      case 'en': return '🇬🇧'; // UK flag for English
+      case 'ar': return '🇮🇶'; // Iraqi flag for Arabic
+      case 'ku': return (
+        <img 
+          src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Flag_of_Kurdistan.svg/1200px-Flag_of_Kurdistan.svg.png" 
+          alt="Kurdistan Flag" 
+          className="flag"
+          style={{ width: '20px', height: '15px', objectFit: 'cover', borderRadius: '2px' }}
+        />
+      );
+      default: return '🇬🇧';
+    }
+  };
+
+  const getLanguageName = (lang) => {
+    switch (lang) {
+      case 'en': return 'English';
+      case 'ar': return 'العربية';
+      case 'ku': return 'کوردی';
+      default: return 'English';
+    }
+  };
+
+  const getLanguageClass = (lang) => {
+    switch (lang) {
+      case 'ar': return 'arabic-text';
+      case 'ku': return 'kurdish-text';
+      default: return '';
+    }
+  };
 
   const handleDailySalesClick = (e) => {
-    if (isAdmin) {
-      e.preventDefault();
-      const password = prompt("Please enter the password:");
-      if (password === "Hama1122") {
-        setIsMenuOpen(false);
-        navigate("/daily-sales");
-      } else {
-        alert("Incorrect password!");
-      }
-    } else {
-      setIsMenuOpen(false);
-    }
+    // Remove password protection - allow direct access
+    setIsMenuOpen(false);
+    navigate("/daily-sales");
   };
 
   const menuItems = [
@@ -80,6 +124,11 @@ const Menu = ({ role, permissions }) => {
       label: translations[language].dailySales,
       key: "dailySales",
       onClick: handleDailySalesClick,
+    },
+    {
+      path: "/brochure",
+      label: translations[language].brochure,
+      key: "brochure",
     },
     {
       path: "/sales-data",
@@ -119,7 +168,6 @@ const Menu = ({ role, permissions }) => {
     },
   ];
 
-  // Admins see all items; others see only permitted items
   const filteredItems = isAdmin
     ? menuItems
     : menuItems.filter((item) => permissions[item.key]);
@@ -131,14 +179,66 @@ const Menu = ({ role, permissions }) => {
           <span className="navbar-logo">Sales Dashboard</span>
         </Link>
         <div className="navbar-buttons">
+          {/* Language Dropdown */}
+          <div className="language-dropdown" ref={languageRef}>
+            <button
+              onClick={toggleLanguage}
+              className="navbar-btn language-btn haptic-feedback"
+            >
+              <span className="flag">{getLanguageFlag(language)}</span>
+              <span className={`language-text ${getLanguageClass(language)}`}>{getLanguageName(language)}</span>
+              <span className={`dropdown-arrow ${isLanguageOpen ? 'open' : ''}`}>▼</span>
+            </button>
+            {isLanguageOpen && (
+              <div className="language-menu">
+                <button
+                  onClick={() => {
+                    changeLanguage('en');
+                    setIsLanguageOpen(false);
+                  }}
+                  className={`language-option ${language === 'en' ? 'active' : ''}`}
+                >
+                  <span className="flag">🇬🇧</span>
+                  <span>English</span>
+                </button>
+                <button
+                  onClick={() => {
+                    changeLanguage('ar');
+                    setIsLanguageOpen(false);
+                  }}
+                  className={`language-option ${language === 'ar' ? 'active' : ''}`}
+                >
+                  <span className="flag">🇮🇶</span>
+                  <span className="arabic-text">العربية</span>
+                </button>
+                <button
+                  onClick={() => {
+                    changeLanguage('ku');
+                    setIsLanguageOpen(false);
+                  }}
+                  className={`language-option ${language === 'ku' ? 'active' : ''}`}
+                >
+                  <span className="flag">
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Flag_of_Kurdistan.svg/1200px-Flag_of_Kurdistan.svg.png" 
+                      alt="Kurdistan Flag" 
+                      style={{ width: '20px', height: '15px', objectFit: 'cover', borderRadius: '2px' }}
+                    />
+                  </span>
+                  <span className="kurdish-text">کوردی</span>
+                </button>
+              </div>
+            )}
+          </div>
+          
           <button
             onClick={handleLogout}
-            className="navbar-btn navbar-logout-btn"
+            className="navbar-btn navbar-logout-btn haptic-feedback"
           >
             {translations[language].logout}
           </button>
           <button
-            className={`navbar-toggle ${isMenuOpen ? "active" : ""}`}
+            className={`navbar-toggle haptic-feedback ${isMenuOpen ? "active" : ""}`}
             onClick={toggleMenu}
           >
             <span className="navbar-toggle-icon">
@@ -179,7 +279,7 @@ const Menu = ({ role, permissions }) => {
               <li key={item.path} className="nav-item">
                 <Link
                   to={item.path}
-                  className="nav-link"
+                  className="nav-link haptic-feedback"
                   onClick={item.onClick || (() => setIsMenuOpen(false))}
                 >
                   {item.label}
